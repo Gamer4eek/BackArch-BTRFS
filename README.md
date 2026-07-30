@@ -1,1 +1,4 @@
-# Will include support for OpenRC(yes, in Archlinux), custom hooks, timestamps with expire dates and autodelete for snapshots
+# Will include: 
+### - support for OpenRC(yes, in Archlinux), 
+### - Custom hooks, 
+### - Timestamps with expire dates and autodelete for snapshots
