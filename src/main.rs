@@ -44,27 +44,27 @@ macro_rules! validate_value {
             if $have_quotes == true {
                 if !$value.starts_with('"') || !$value.ends_with('"') {
                     eprintln!("{}", $obj);
-                    Err(format!("Value must be put in double quotes"))
+                    Err("Value must be put in double quotes")
                 } else {
                     let no_quotes = &$value[1..$value.len()-1];
                     if FORBIDDEN_SYMBOLS.iter().any(|&s| no_quotes.contains(s)) {
                         eprintln!("{}", $obj);
                         eprintln!("List of forbidden symbols: {}", FORBIDDEN_SYMBOLS.join(", "));
-                        Err(format!("Value contains forbidden symbol(s)"))
+                        Err("Value contains forbidden symbol(s)")
                     } else { Ok(no_quotes) }
                 }
             } else {
                 if FORBIDDEN_SYMBOLS.iter().any(|&s| $value.contains(s)) {
                     eprintln!("{}", $obj);
                     eprintln!("List of forbidden symbols: {}", FORBIDDEN_SYMBOLS.join(", "));
-                    Err(format!("Value contains forbidden symbol(s)"))
+                    Err("Value contains forbidden symbol(s)")
                 } else { Ok($value) }
             }
-        } else { eprintln!("{}", $obj); Err(format!("Empty value")) }
+        } else { eprintln!("{}", $obj); Err("Empty value") }
     }
 }
 
-fn help(tutorial: bool) -> Result<(), String> {
+fn help(tutorial: bool) -> Result<(), &'static str> {
     if tutorial == true {
         return Ok(());
     } else {
@@ -114,13 +114,13 @@ impl SnapshotInfo {
             log_file:    None,
         }
     }
-    pub fn parse_args(&mut self) -> Result<(), String> {
+    pub fn parse_args(&mut self) -> Result<(), &'static str> {
         let args: Vec<String> = std::env::args().skip(1).collect();    
         for arg in args {
             if let Some((key, value)) = arg.split_once('=') {
                 let data = { 
                     if value.starts_with('"') && value.len() < 2 {
-                        eprintln!("{}", arg); Err(format!("Empty value"))?
+                        eprintln!("{}", arg); Err("Empty value")?
                     } else { validate_value!(arg, value, false)? }
                 };
                 match key {
@@ -144,7 +144,7 @@ impl SnapshotInfo {
 
                     "--log"         => { insert_values!(self; log_file    = data); Ok(()) }
 
-                    _ => { eprintln!("{}", arg); Err(format!("Wrong argument")) }
+                    _ => { eprintln!("{}", arg); Err("Wrong argument") }
                 }?
             } else {
                 if arg == "--help" {
@@ -153,7 +153,7 @@ impl SnapshotInfo {
                     help(true)?;  std::process::exit(0);
                 } else {
                     eprintln!("{}", arg);
-                    Err(format!("Wrong argument"))? 
+                    Err("Wrong argument")? 
                 }
             }
             
@@ -161,7 +161,7 @@ impl SnapshotInfo {
         insert_values!(self; config_file = "/etc/backarch/backarch.conf");
         Ok(())
     }
-    pub fn parse_config(&mut self) -> Result<(), String> {
+    pub fn parse_config(&mut self) -> Result<(), &'static str> {
         if let Some(conf) = &self.config_file {
             match std::fs::File::open(&conf) {
                 Ok(file) => {
@@ -181,7 +181,7 @@ impl SnapshotInfo {
                         if let Some((key, value)) = opt.split_once('=') { 
                             let data = { 
                                 if value.starts_with('"') && value.len() < 2 {
-                                    eprintln!("{}", opt); Err(format!("Empty value"))?
+                                    eprintln!("{}", opt); Err("Empty value")?
                                 } else { validate_value!(opt, value, true)? }
                             };
                             match key {
@@ -203,13 +203,13 @@ impl SnapshotInfo {
 
                                 "log"         => { insert_values!(self; log_file    = data); Ok(()) }
                                 
-                                _ => { eprintln!("{}", key); Err(format!("Invalid option")) } 
+                                _ => { eprintln!("{}", key); Err("Invalid option") } 
                             }?;
                         } else { 
                             if opt.is_empty() {
                                 return Ok(());
                             } else {
-                                eprintln!("{}", opt); Err(format!("Invalid option"))?
+                                eprintln!("{}", opt); Err("Invalid option")?
                             }
                         }
                     }
@@ -242,7 +242,7 @@ impl SnapshotInfo {
     }
 }
 
-fn main() -> Result<(), String> {
+fn main() -> Result<(), &'static str> {
     let mut snap_info = SnapshotInfo::new();
 
     snap_info.parse_args()?;
