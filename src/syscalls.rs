@@ -1,50 +1,32 @@
+//    BackArch is a CLI tool for managing BTRFS snapshots
+//
+//    Copyright (C) 2026  Gamer4eek <gamer4eek1@gmail.com>
+//
+//    This program is free software: you can redistribute it and/or modify
+//    it under the terms of the GNU General Public License as published by
+//    the Free Software Foundation, either version 3 of the License, or
+//    (at your option) any later version.
+//
+//    This program is distributed in the hope that it will be useful,
+//    but WITHOUT ANY WARRANTY; without even the implied warranty of
+//    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//    GNU General Public License for more details.
+//
+//    You should have received a copy of the GNU General Public License
+//    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+use crate::constants::btrfs::{BTRFS_MAGIC, SNAP_CREATE_V2_NR,};
+use crate::constants::ioctl::{
+    IOCTL, IOC_WRITE, 
+    IOC_TYPESHIFT, IOC_DIRSHIFT,
+    IOC_NRSHIFT, IOC_SIZESHIFT,
+};
+
 use std::os::fd::AsRawFd;
-
-const BTRFS_IOCTL_MAGIC: u64 = 0x94;
-const IOCTL: u64 = 16;
-const SNAPSHOT_READONLY: u64 = 0x02;
-const SNAPSHOT_ASYNC: u64 = 0x04;
-const BTRFS_IOC_SNAP_CREATE_V2: u64 = 0x50009417;
+use std::mem::size_of as sizeof;
 
 #[repr(C)]
-#[derive(Copy, Clone, Debug)]
-struct btrfs_qgroup_limit {
-    flags:    u64,
-    max_rfer: u64,
-    max_excl: u64,
-    rsv_rfer: u64,
-    rsv_excl: u64,
-}
-
-#[repr(C)]
-#[derive(Copy, Clone, Debug)]
-struct btrfs_qgroup_inherit {
-    flags:           u64,
-    num_qgroups:     u64,
-    num_ref_copies:  u64,
-    num_excl_copies: u64,
-    limit:           btrfs_qgroup_limit,
-    qgroups:         [u64; 20],
-}
-
-#[repr(C)]
-//#[derive(Debug)]
-union btrfs_ioctl_vol_args_v2_union1 {
-    qgroup: btrfs_qgroup_inherit,
-    unused: [u64; 4],
-}
-
-#[repr(C)]
-//#[derive(Debug)]
-union btrfs_ioctl_vol_args_v2_union2 {
-    name:     [u8; 4040],
-    devid:    u64,
-    subvolid: u64,
-}
-
-#[repr(C)]
-//#[derive(Debug)]
-struct btrfs_ioctl_vol_args_v2 {
+struct vol_args {
     fd:      i64,
     transid: u64,
     flags:   u64,
@@ -52,12 +34,22 @@ struct btrfs_ioctl_vol_args_v2 {
     name:    [u8; 4040],
 }
 
-pub fn make_syscall() -> Result<(), &'static str> {
-    let file = match std::fs::File::open("/") {
+const SNAP_CREATE_V2: u64 = ioc!(
+    IOC_WRITE, BTRFS_MAGIC, 
+    SNAP_CREATE_V2_NR, sizeof::<vol_args>()
+);
+
+pub fn make_syscall(
+    snap_name: &str,
+    snap_dir:  &str,
+    fsroot:    &str,
+) -> Result<(), &'static str> {
+
+    let file = match std::fs::File::open(fsroot) {
         Ok(file) => Ok(file),
         Err(_)   => Err("File error")
     }?;
-    let dir = match std::fs::File::open("/.snapshots") {
+    let dir = match std::fs::File::open(snap_dir) {
         Ok(dir) => Ok(dir),
         Err(_)  => Err("Dir error")
     }?;
@@ -65,36 +57,34 @@ pub fn make_syscall() -> Result<(), &'static str> {
     let filefd = file.as_raw_fd();
     let dirfd = dir.as_raw_fd();
 
-    let mut args: btrfs_ioctl_vol_args_v2 = unsafe { std::mem::zeroed() };
-    
-    args.fd = 3;
-    args.flags = SNAPSHOT_READONLY;
-    args.transid = 0;
+    let mut name = [0u8; 4040];
+    let mut bytes = snap_name.as_bytes().to_vec();
+    bytes.push(0);
+    name[..bytes.len()].copy_from_slice(&bytes);
 
-    let name = *b"arch\0";
-    unsafe { args.name[..name.len()].copy_from_slice(&name); }
+    let mut args = vol_args {
+        fd: filefd as i64,
+        flags: 0,
+        transid: 0,
+        qgroups: [0u64; 4],
+        name: name,
+    };
 
-   // unsafe {
-   //     args.union2.name[..name.len()].copy_from_slice(name);
-// //       args.union2.name[len] = 0;
-   // }
     unsafe {
         let result: i64;
+        syscall!(
+            nostack, preserves_flags, readonly;
 
-        std::arch::asm!(
-            "syscall",
-            in("rax") IOCTL,
-            in("rdi") 4,
-            in("rsi") BTRFS_IOC_SNAP_CREATE_V2,
-            in("rdx") &mut args as *mut _,
-            lateout("rax") result,
-            options(nostack, preserves_flags, readonly)
+            IOCTL, dirfd, 
+            SNAP_CREATE_V2, &mut args
+
+            => result
         );
+
         if result == -1 {
             println!("Провал! {} {} {}", args.fd, args.flags, args.transid );
-            println!("{:?}", args.name);
             println!("returned: {}", result);
-            return Err("Провал");
+            return Ok(());
         } else {
             println!("Ура, победа! {} {} {}", args.fd, args.flags, args.transid );
             println!("returned: {}", result);

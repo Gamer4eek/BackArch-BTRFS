@@ -1,105 +1,56 @@
+//    BackArch is a CLI tool for managing BTRFS snapshots
+//
+//    Copyright (C) 2026  Gamer4eek <gamer4eek1@gmail.com>
+//
+//    This program is free software: you can redistribute it and/or modify
+//    it under the terms of the GNU General Public License as published by
+//    the Free Software Foundation, either version 3 of the License, or
+//    (at your option) any later version.
+//
+//    This program is distributed in the hope that it will be useful,
+//    but WITHOUT ANY WARRANTY; without even the implied warranty of
+//    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//    GNU General Public License for more details.
+//
+//    You should have received a copy of the GNU General Public License
+//    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+use crate::helper;
+use crate::constants::args::{
+    ARGS, FORBIDDEN_SYMBOLS,
+    EMPTY_ERROR, PATH_ERROR,
+    SYMBOL_ERROR, KEY_ERROR,
+};
+use crate::constants::opts::{
+    OPTS, EASTER_EGG, EASTER_EGG_MSG,
+    LIST_ERROR, DQUOTES_ERROR, 
+    CONF_WARNING, COMMENTS, CAN_SNAP,
+    CANT_SNAP_ERROR,
+};
+
+use std::process::exit;
+use std::env::args;
+use std::fs::{File, metadata};
+use std::io::{BufReader, BufRead};
+
 #[derive(Debug)]
 pub struct SnapshotInfo {
     pub name:        Option<String>,
-
     pub config_file: Option<String>,
-
     pub drive_uuid:  Option<String>,
     pub grub_file:   Option<String>,
-
     pub hooks_dir:   Option<String>,
     pub dir:         Option<String>,
     pub ro_dir:      Option<String>,
-
     pub fsroot_path: Option<String>,
     pub usr_path:    Option<String>,
     pub var_path:    Option<String>,
     pub boot_path:   Option<String>,
     pub home_path:   Option<String>,
     pub root_path:   Option<String>,
-
+    pub mnt_path:    Option<String>,
     pub log_file:    Option<String>,
-}
-
-const EMPTY_ERROR:   &'static str = "Empty value";
-const DQUOTES_ERROR: &'static str = "Value must be put in double quotes";
-const SYMBOL_ERROR:  &'static str = "Value contains forbidden symbol(s)";
-const ARG_ERROR:     &'static str = "Invalid argument";
-const OPT_ERROR:     &'static str = "Invalid option";
-const CONF_WARNING:  &'static str = "Warning: could not find or open the configuration file";
-
-const FORBIDDEN_SYMBOLS: [&'static str; 24] = [
-    "'", "\"", "//", ":", ";", "..", "@", "$", "#",
-    "№", "*", "`", "~", "[", "]", "{", "}", "?", "<", ">",
-    ",", "(", ")", "="
-];
-
-macro_rules! insert_values {
-    ($struct:ident; 
-     $($field:ident = $value:expr),* $(,)?
-     ) => {
-        $(
-            if $struct.$field == None {
-                $struct.$field = Some($value.to_string());
-            }
-        )*
-    }
-}
-macro_rules! validate_value {
-    ($obj:expr, $value:expr, $have_quotes:expr) => {
-        if !$value.trim_matches('"').is_empty() {
-            if $have_quotes == true {
-                if !$value.starts_with('"') || !$value.ends_with('"') {
-                    eprintln!("{}", $obj);
-                    Err(DQUOTES_ERROR)
-                } else {
-                    let no_quotes = &$value[1..$value.len()-1];
-                    if FORBIDDEN_SYMBOLS.iter().any(|&s| no_quotes.contains(s)) {
-                        eprintln!("{}", $obj);
-                        eprintln!("List of forbidden symbols: {}", FORBIDDEN_SYMBOLS.join(", "));
-                        Err(SYMBOL_ERROR)
-                    } else { Ok(no_quotes) }
-                }
-            } else {
-                if FORBIDDEN_SYMBOLS.iter().any(|&s| $value.contains(s)) {
-                    eprintln!("{}", $obj);
-                    eprintln!("List of forbidden symbols: {}", FORBIDDEN_SYMBOLS.join(", "));
-                    Err(SYMBOL_ERROR)
-                } else { Ok($value) }
-            }
-        } else { eprintln!("{}", $obj); Err("Empty value") }
-    }
-}
-
-fn help(tutorial: bool) -> Result<(), &'static str> {
-    if tutorial == true {
-        return Ok(());
-    } else {
-        println!("Usage(must have root access): backarch [--option=value]");
-        println!(" ");
-        println!("    --help:       Display this help message");
-        println!(" ");
-        println!("    --name:       Set name of the snapshot");
-        println!(" ");
-        println!("    --config:     Configuration file to use");
-        println!(" ");
-        println!("    --drive-uuid: UUID of the system drive");
-        println!("    --grub-file:  Set the name of GRUB menuentry");
-        println!(" ");
-        println!("    --hooks:      Set hooks' directory");
-        println!("    --dir:        Set the snapshot's directory");
-        println!("    --ro-dir:     Set the readonly snaphot's directory");
-        println!(" ");
-        println!("    --fsroot:     Set path to the filesystem root, i.e., /");
-        println!("    --usr:        Set path to the /usr directory");
-        println!("    --var:        Set path to the /var directory");
-        println!("    --boot:       Set path to the /boot directory");
-        println!("    --home:       Set path to the /home directory");
-        println!("    --root:       Set path to the /root directory");
-        println!(" ");
-        println!("    --log:        Set a file to log into");
-        return Ok(());
-    }
+    pub to_snap:     Option<Vec<String>>,
 }
 
 impl SnapshotInfo {
@@ -118,129 +69,248 @@ impl SnapshotInfo {
             boot_path:   None,
             home_path:   None,
             root_path:   None,
+            mnt_path:    None,
             log_file:    None,
+            to_snap:     None,
         }
     }
     pub fn parse_args(&mut self) -> Result<(), &'static str> {
-        for arg in std::env::args().skip(1) {
-            if let Some((key, value)) = arg.split_once('=') {
-                let data = { 
-                    if value.starts_with('"') && value.len() < 2 {
-                        eprintln!("{}", arg); Err(EMPTY_ERROR)?
-                    } else { validate_value!(arg, value, false)? }
-                };
-                match key {
-                    "--name"        => { insert_values!(self; name        = data); Ok(()) }
+        let mut a: Vec<String> = Vec::with_capacity(16);
 
-                    "--config"      => { insert_values!(self; config_file = data); Ok(()) }
-
-                    "--drive-uuid"  => { insert_values!(self; drive_uuid  = data); Ok(()) }
-                    "--grub-file"   => { insert_values!(self; grub_file   = data); Ok(()) }
-
-                    "--hooks-dir"   => { insert_values!(self; hooks_dir   = data); Ok(()) }
-                    "--dir"         => { insert_values!(self; dir         = data); Ok(()) }
-                    "--ro-dir"      => { insert_values!(self; ro_dir      = data); Ok(()) }
-
-                    "--fsroot-path" => { insert_values!(self; fsroot_path = data); Ok(()) }
-                    "--usr-path"    => { insert_values!(self; usr_path    = data); Ok(()) }
-                    "--var-path"    => { insert_values!(self; var_path    = data); Ok(()) }
-                    "--boot-path"   => { insert_values!(self; boot_path   = data); Ok(()) }
-                    "--home-path"   => { insert_values!(self; home_path   = data); Ok(()) }
-                    "--root-path"   => { insert_values!(self; root_path   = data); Ok(()) }
-
-                    "--log"         => { insert_values!(self; log_file    = data); Ok(()) }
-
-                    _ => { eprintln!("{}", arg); Err(ARG_ERROR) }
-                }?
-            } else {
-                if arg == "--help" {
-                    help(false)?; std::process::exit(0);
-                } else if arg == "--tutorial" {
-                    help(true)?;  std::process::exit(0);
-                } else {
-                    eprintln!("{}", arg);
-                    Err(ARG_ERROR)? 
-                }
-            }
-            
+        a.extend(args().skip(1)); 
+        if a.iter().any(|arg| arg == "--help") {
+            helper::help()?; exit(0);
         }
-        insert_values!(self; config_file = "/etc/backarch/backarch.conf");
+        if a.iter().any(|arg| arg == "--tutorial") {
+            helper::tutorial()?; exit(0);
+        }
+        
+        collect(&a, self, false)?;
         Ok(())
     }
     pub fn parse_config(&mut self) -> Result<(), &'static str> {
-        if let Some(conf) = &self.config_file {
-            match std::fs::File::open(&conf) {
-                Ok(file) => {
-                    let mut reader = std::io::BufReader::new(file);
-                    for line in std::io::BufRead::lines(&mut reader) {
-                        let line = match line {
-                            Ok(line)  => { if line.is_empty() { continue; } else { line } },
-                            Err(_)    => { eprintln!("{}", CONF_WARNING); " ".to_string() }
-                        };
-                        let opt = match line.split(";;").next() {
-                            Some(opt) => opt.trim(),
-                            None      => ""
-                        };
-                        if let Some((key, value)) = opt.split_once('=') { 
-                            let data = { 
-                                if value.starts_with('"') && value.len() < 2 {
-                                    eprintln!("{}", opt); Err(EMPTY_ERROR)?
-                                } else { validate_value!(opt, value, true)? }
-                            };
-                            match key {
-                                "name"        => { insert_values!(self; name        = data); Ok(()) }
+        let mut opts: Vec<String> = Vec::with_capacity(15);
 
-                                "drive_uuid"  => { insert_values!(self; drive_uuid  = data); Ok(()) }
-                                "grub_file"   => { insert_values!(self; grub_file   = data); Ok(()) }
-
-                                "hooks_dir"   => { insert_values!(self; hooks_dir   = data); Ok(()) }
-                                "dir"         => { insert_values!(self; dir         = data); Ok(()) }
-                                "ro_dir"      => { insert_values!(self; ro_dir      = data); Ok(()) }
-
-                                "fsroot_path" => { insert_values!(self; fsroot_path = data); Ok(()) }
-                                "usr_path"    => { insert_values!(self; usr_path    = data); Ok(()) }
-                                "var_path"    => { insert_values!(self; var_path    = data); Ok(()) }
-                                "boot_path"   => { insert_values!(self; boot_path   = data); Ok(()) }
-                                "home_path"   => { insert_values!(self; home_path   = data); Ok(()) }
-                                "root_path"   => { insert_values!(self; root_path   = data); Ok(()) }
-
-                                "log"         => { insert_values!(self; log_file    = data); Ok(()) }
-                                
-                                _ => { eprintln!("{}", key); Err(OPT_ERROR) } 
-                            }?;
-                        } else { 
-                            if opt.is_empty() {
-                                return Ok(());
-                            } else {
-                                eprintln!("{}", opt); Err(OPT_ERROR)?
-                            }
-                        }
-                    }
-                    return Ok(());
+        let Some(conf) = &self.config_file else { 
+            eprintln!("{}", CONF_WARNING); return Ok(()); 
+        };
+        let file = match File::open(conf) {
+            Ok(file) => file,
+            _ => { eprintln!("{}", CONF_WARNING); return Ok(()); }
+        };
+        let mut reader = BufReader::new(file);
+        for line in BufRead::lines(&mut reader) {
+            let line = match line {
+                Ok(line) => {
+                    if line.trim().is_empty() { continue; } else { line }
                 }
-                Err(_) => { eprintln!("{}", CONF_WARNING); return Ok(()); }
+                Err(_) => { eprintln!("{}", CONF_WARNING); break; }
+            };
+            comments!(line, opts);
+            if opts.iter().any(|s| EASTER_EGG.contains(s.trim())) {
+                println!("{}", EASTER_EGG_MSG); exit(0);
             }
-        } else {
-            eprintln!("{}", CONF_WARNING);
-            Ok(())
         }
+        collect(&opts, self, true)?;
+        Ok(())
     }
-    pub fn set_defaults(&mut self) {
-        insert_values!(
-            self;
-            name        = "Archlinux",
+    pub fn set_defaults(&mut self) -> Result<(), &'static str> {
+        insert!(
+            self,
+            name        = "ArchLinux",
             config_file = "/etc/backarch/backarch.conf",
             grub_file   = format!("40_backarch_{}", { if let Some(name) = &self.name { name } else { "ArchLinux" } }),
             hooks_dir   = "/etc/backarch/hooks",
             dir         = "/.snapshots",
-            ro_dir      = "/.snapshots_ro",
             fsroot_path = "/",
             usr_path    = "/usr",
             var_path    = "/var",
             boot_path   = "/boot",
             home_path   = "/home",
             root_path   = "/root",
-            log_file    = "/var/log/backarch/backarch.log",
-        );
+            mnt_path    = "/mnt",
+        )?;
+        insert!(vec: self,
+            to_snap = vec![
+                "fsroot".to_string(), "usr".to_string(), "var".to_string(), 
+                "boot".to_string(), "home".to_string(), "root".to_string(), "mnt".to_string()
+            ],
+        )
     }
+}
+fn collect(objs: &Vec<String>, snap_info: &mut SnapshotInfo, conf: bool) -> Result<(), &'static str> {
+    for obj in objs {
+        let (key, mut value) = match obj.split_once('=') {
+            Some((key,value)) => (key.trim(),value.trim()),
+            None => {
+                return Err(error!(obj, { helper::help()? } => KEY_ERROR)?);
+            }
+        };
+        if !ARGS.iter().any(|&s| key == s) {
+            if !OPTS.iter().any(|&s| key == s) {
+                error!(obj, { helper::help()? } => KEY_ERROR)?;
+            }
+        }
+        if value == "_" { continue; }
+        if conf {
+            if key == ARGS[15] || key == OPTS[14] {
+                if !(
+                    (value.starts_with('<') || value.ends_with('>')) ||
+                    (value.starts_with('[') || value.ends_with(']')) ||
+                    (value.starts_with('{') || value.ends_with('}'))
+                ) {
+                    dquotes!(value => error!(obj => DQUOTES_ERROR))?;
+                    value = value.trim_matches('"');
+                }
+            } else {
+                dquotes!(value => error!(obj => DQUOTES_ERROR))?;
+                value = value.trim_matches('"');
+            }
+        }
+        is_empty!(value => error!(obj => EMPTY_ERROR))?;
+        if key == ARGS[15] || key == OPTS[14] {
+            if !(
+                (value.starts_with('<') || value.ends_with('>')) ||
+                (value.starts_with('[') || value.ends_with(']')) ||
+                (value.starts_with('{') || value.ends_with('}'))
+            ) {
+                forbidden!(FORBIDDEN_SYMBOLS, value =>
+                    error!(
+                        obj,
+                        { helper::help()?; }
+                        => SYMBOL_ERROR
+                    )
+                )?;
+            }
+        } else {
+            forbidden!(FORBIDDEN_SYMBOLS, value =>
+                error!(
+                    obj,
+                    { helper::help()?; }
+                    => SYMBOL_ERROR
+                )
+            )?;
+        }
+        match key {
+            v if v == ARGS[0]  => { insert!(snap_info, name = value) }
+            v if v == ARGS[1]  => { 
+                path!(value, is_file => error!(obj => PATH_ERROR))?;
+                insert!(snap_info, config_file = value)
+            }
+            v if v == ARGS[2]  => { insert!(snap_info, drive_uuid = value) }
+            v if v == ARGS[3]  => { 
+                path!(filedir: value => error!(obj => PATH_ERROR))?;
+                insert!(snap_info, grub_file = value)
+            }
+            v if v == ARGS[4]  => { 
+                path!(value, is_dir => error!(obj => PATH_ERROR))?;
+                insert!(snap_info, hooks_dir = value) 
+            }
+            v if v == ARGS[5]  => { 
+                path!(value, is_dir => error!(obj => PATH_ERROR))?;
+                insert!(snap_info, dir = value) 
+            }
+            v if v == ARGS[6]  => { 
+                path!(value, is_dir => error!(obj => PATH_ERROR))?;
+                insert!(snap_info, ro_dir = value) 
+            }
+            v if v == ARGS[7]  => { 
+                path!(value, is_dir => error!(obj => PATH_ERROR))?;
+                insert!(snap_info, fsroot_path = value) 
+            }
+            v if v == ARGS[8]  => { 
+                path!(value, is_dir => error!(obj => PATH_ERROR))?;
+                insert!(snap_info, usr_path = value) 
+            }
+            v if v == ARGS[9]  => { 
+                path!(value, is_dir => error!(obj => PATH_ERROR))?;
+                insert!(snap_info, var_path = value) 
+            }
+            v if v == ARGS[10]  => { 
+                path!(value, is_dir => error!(obj => PATH_ERROR))?;
+                insert!(snap_info, boot_path = value) 
+            }
+            v if v == ARGS[11]  => { 
+                path!(value, is_dir => error!(obj => PATH_ERROR))?;
+                insert!(snap_info, home_path = value) 
+            }
+            v if v == ARGS[12]  => { 
+                path!(value, is_dir => error!(obj => PATH_ERROR))?;
+                insert!(snap_info, root_path = value) 
+            }
+            v if v == ARGS[13]  => { 
+                path!(value, is_dir => error!(obj => PATH_ERROR))?;
+                insert!(snap_info, mnt_path = value) 
+            }
+            v if v == ARGS[14]  => { 
+                path!(filedir: value => error!(obj => PATH_ERROR))?;
+                insert!(snap_info, log_file = value)
+            }
+            v if v == ARGS[15]  => {
+                let mut values: Vec<String> = Vec::with_capacity(6);
+                list!(value; values => obj; error!(obj, { helper::help()?; } => LIST_ERROR))?;
+                insert!(vec: snap_info, to_snap = values)
+            }
+
+            v if v == OPTS[0]  => { insert!(snap_info, name = value) }
+            v if v == OPTS[1]  => { insert!(snap_info, drive_uuid = value) }
+            v if v == OPTS[2]  => { 
+                path!(filedir: value => error!(obj => PATH_ERROR))?;
+                insert!(snap_info, grub_file = value)
+            }
+            v if v == OPTS[3]  => { 
+                path!(value, is_dir => error!(obj => PATH_ERROR))?;
+                insert!(snap_info, hooks_dir = value) 
+            }
+            v if v == OPTS[4]  => { 
+                path!(value, is_dir => error!(obj => PATH_ERROR))?;
+                insert!(snap_info, dir = value) 
+            }
+            v if v == OPTS[5]  => { 
+                path!(value, is_dir => error!(obj => PATH_ERROR))?;
+                insert!(snap_info, ro_dir = value) 
+            }
+            v if v == OPTS[6]  => { 
+                path!(value, is_dir => error!(obj => PATH_ERROR))?;
+                insert!(snap_info, fsroot_path = value) 
+            }
+            v if v == OPTS[7]  => { 
+                path!(value, is_dir => error!(obj => PATH_ERROR))?;
+                insert!(snap_info, usr_path = value) 
+            }
+            v if v == OPTS[8]  => { 
+                path!(value, is_dir => error!(obj => PATH_ERROR))?;
+                insert!(snap_info, var_path = value) 
+            }
+            v if v == OPTS[9]  => { 
+                path!(value, is_dir => error!(obj => PATH_ERROR))?;
+                insert!(snap_info, boot_path = value) 
+            }
+            v if v == OPTS[10]  => { 
+                path!(value, is_dir => error!(obj => PATH_ERROR))?;
+                insert!(snap_info, home_path = value) 
+            }
+            v if v == OPTS[11]  => { 
+                path!(value, is_dir => error!(obj => PATH_ERROR))?;
+                insert!(snap_info, root_path = value) 
+            }
+            v if v == OPTS[12]  => { 
+                path!(value, is_dir => error!(obj => PATH_ERROR))?;
+                insert!(snap_info, mnt_path = value) 
+            }
+            v if v == OPTS[13]  => { 
+                path!(filedir: value => error!(obj => PATH_ERROR))?;
+                insert!(snap_info, log_file = value)
+            }
+            v if v == OPTS[14]  => {
+                let mut values: Vec<String> = Vec::with_capacity(6);
+                list!(value; values => obj; error!(obj, { helper::help()?; } => LIST_ERROR))?;
+                insert!(vec: snap_info, to_snap = values)
+            }
+
+            _ => { error!(obj, { helper::help()?; } => KEY_ERROR) }
+        }?;
+    }
+    insert!(snap_info, config_file = "/etc/backarch/backarch.conf")?;
+    Ok(())
 }

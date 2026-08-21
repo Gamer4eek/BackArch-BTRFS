@@ -1,6 +1,8 @@
 /target
-Cargo.lock
-testconfig
+*.lock
+*test*
 *.svg
 *.data
 *.old
+*.conf
+*.test
