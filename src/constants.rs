@@ -21,8 +21,8 @@ pub mod args {
         "--dir", "--ro-dir", "--fsroot", "--usr", "--var", "--boot", "--home",
         "--root", "--mnt", "--log", "--to-snap",
     ];
-    pub const FORBIDDEN_SYMBOLS: [&str; 23] = [
-        "'","\"","//",":",";","..","@","$","#","№","`","\\n",
+    pub const FORBIDDEN_SYMBOLS: [&str; 22] = [
+        "'","\"","//",":",";","..","@","$","#","`","\\",
         "*","[","]","{", "}","?","<",">",",","(",")",
     ];
     pub const EMPTY_ERROR:  &str = "Empty value";
@@ -37,14 +37,14 @@ pub mod opts {
         "fsroot", "usr", "var", "boot", "home", "root", "mnt", "log", 
         "to_snap",
     ];
-    pub const FORBIDDEN_SYMBOLS: [&str; 23] = [
-        "'","\"","//",":",";","..","@","$","#","№","`","\\n",
+    pub const FORBIDDEN_SYMBOLS: [&str; 22] = [
+        "'","\"","//",":",";","..","@","$","#","`","\\",
         "*","[","]","{", "}","?","<",">",",","(",")",
     ];
     pub const LIST_BRACKETS: [&str; 3] = ["<>", "[]", "{}"];
     pub const CAN_SNAP:      [&str; 7] = ["fsroot", "usr", "var", "boot", "home", "root", "mnt"];
 
-    pub const COMMENTS: (char, &str, &str, &str, &str) = ('#', ";;", "==>", "-->", "//");
+    pub const COMMENTS: (char, &str, &str, &str, &str, &str) = ('#', ";;", "==>", "-->", "//", "/*");
 
     pub const PATH_ERROR:      &str = "Invalid path";
     pub const KEY_ERROR:       &str = "Invalid argument/option";

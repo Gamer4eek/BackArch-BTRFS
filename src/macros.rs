@@ -226,6 +226,12 @@ macro_rules! comments {
                 }
                 break;
             }
+            if i+1 < len && chars[i..=i+1].iter().collect::<String>() == COMMENTS.5 {
+                if let Some((o, _)) = $line.split_once(COMMENTS.5) {
+                    opt = o.to_string();
+                }
+                break;
+            }
         }
         if opt.trim().is_empty() {
             continue;
