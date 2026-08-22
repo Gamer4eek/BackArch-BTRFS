@@ -25,26 +25,6 @@ macro_rules! error {
         Err($err)
     }};
 }
-macro_rules! forbidden {
-    (
-        $forbidden:expr, $value:expr => $result:expr
-    ) => 
-    {
-        if !$forbidden.iter().any(|&s| $value.contains(s)) {
-            Ok(())
-        } else { $result }
-    }
-}
-macro_rules! is_empty {
-    (
-        $value:expr => $result:expr
-    ) =>
-    {{
-        if !$value.trim_matches('"').is_empty() {
-            Ok(())
-        } else { $result }
-    }};
-}
 macro_rules! insert {
     (
         $struct:ident, $($field:ident = $value:expr),* $(,)?
@@ -69,6 +49,26 @@ macro_rules! insert {
         Ok(())
     }};
 }
+macro_rules! forbidden {
+    (
+        $forbidden:expr, $value:expr => $result:expr
+    ) => 
+    {
+        if !$forbidden.iter().any(|&s| $value.contains(s)) {
+            Ok(())
+        } else { $result }
+    }
+}
+macro_rules! is_empty {
+    (
+        $value:expr => $result:expr
+    ) =>
+    {{
+        if !$value.trim_matches('"').is_empty() {
+            Ok(())
+        } else { $result }
+    }};
+}
 macro_rules! dquotes {
     (
         $value:ident => $result:expr
@@ -78,59 +78,6 @@ macro_rules! dquotes {
             Ok(())
         } else { $result }
     }
-}
-macro_rules! list {
-    (
-        $value:expr; $values:ident => $obj:expr; $result:expr
-    ) =>
-    {{
-        if $value.starts_with('<') && $value.ends_with('>') {
-            $values = $value.trim_matches(|c| c == '<' || c == '>')
-                .split(',')
-                .map(|s| s.trim().to_string())
-                .collect();
-            for value in $values.iter_mut() {
-                is_empty!(value => error!($obj => EMPTY_ERROR))?;
-                dquotes!(value => error!($obj => DQUOTES_ERROR))?;
-                *value = value.trim_matches('"').to_string();
-                is_empty!(value => error!($obj => EMPTY_ERROR))?;
-                if !CAN_SNAP.iter().any(|&s| value == s) {
-                    error!($obj, { crate::helper::help()?; } => CANT_SNAP_ERROR)?;
-                }
-            }
-            Ok(())
-        } else if $value.starts_with('[') && $value.ends_with(']') { 
-            $values = $value.trim_matches(|c| c == '[' || c == ']')
-                .split(',')
-                .map(|s| s.trim().to_string())
-                .collect();
-            for value in $values.iter_mut() {
-                is_empty!(value => error!($obj => EMPTY_ERROR))?;
-                dquotes!(value => error!($obj => DQUOTES_ERROR))?;
-                *value = value.trim_matches('"').to_string();
-                is_empty!(value => error!($obj => EMPTY_ERROR))?;
-                if !CAN_SNAP.iter().any(|&s| value == s) {
-                    error!($obj, { crate::helper::help()?; } => CANT_SNAP_ERROR)?;
-                }
-            }
-            Ok(())
-        } else if $value.starts_with('{') && $value.ends_with('}') {
-            $values = $value.trim_matches(|c| c == '{' || c == '}')
-                .split(',')
-                .map(|s| s.trim().to_string())
-                .collect();
-            for value in $values.iter_mut() {
-                is_empty!(value => error!($obj => EMPTY_ERROR))?;
-                dquotes!(value => error!($obj => DQUOTES_ERROR))?;
-                *value = value.trim_matches('"').to_string();
-                is_empty!(value => error!($obj => EMPTY_ERROR))?;
-                if !CAN_SNAP.iter().any(|&s| value == s) {
-                    error!($obj, { crate::helper::help()?; } => CANT_SNAP_ERROR)?;
-                }
-            }
-            Ok(())
-        } else { $result }
-    }};
 }
 macro_rules! path {
     (
@@ -153,37 +100,6 @@ macro_rules! path {
                 path!(dir, is_dir => $result)
             }
             None => { $result }
-        }
-    }
-}
-macro_rules! syscall {
-    (
-        $($opts:ident),*;
-        $rax:expr, $rdi:expr, 
-        $rsi:expr, $rdx:expr $(=> $result:expr)?
-    ) =>
-    {
-        core::arch::asm!(
-            "syscall",
-            in("rax") $rax,
-            in("rdi") $rdi,
-            in("rsi") $rsi,
-            in("rdx") $rdx,
-            $(lateout("rax") $result,)?
-            options($($opts),*)
-        );
-    }
-}
-macro_rules! ioc {
-    (
-        $dir:expr, $type:expr, $nr:expr, $size:expr
-    ) =>
-    {
-        {
-            (($dir as u64)  << IOC_DIRSHIFT)  |
-            (($type as u64) << IOC_TYPESHIFT) |
-            (($nr as u64)   << IOC_NRSHIFT)   |
-            (($size as u64) << IOC_SIZESHIFT)
         }
     }
 }
@@ -237,6 +153,81 @@ macro_rules! comments {
             continue;
         } else {
             $opts.push(opt);
+        }
+    }
+}
+macro_rules! list {
+    (
+        $value:expr; $values:ident;
+        $char1:expr, $char2:expr
+        => $obj:expr
+    ) =>
+    {{
+        $values = $value.trim_matches(|c| c == $char1 || c == $char2)
+            .split(',')
+            .map(|s| s.trim().to_string())
+            .collect();
+        for value in $values.iter_mut() {
+            is_empty!(value => error!($obj => EMPTY_ERROR))?;
+            dquotes!(value => error!($obj => DQUOTES_ERROR))?;
+            *value = value.trim_matches('"').to_string();
+            is_empty!(value => error!($obj => EMPTY_ERROR))?;
+            if !CAN_SNAP.iter().any(|&s| value == s) {
+                error!($obj, { crate::helper::help()?; } => CANT_SNAP_ERROR)?;
+            }
+        }
+        Ok(())
+    }};
+    (
+        $value:expr; $values:ident => $obj:expr; $result:expr
+    ) =>
+    {{
+        if $value.starts_with(BRACKETS.0) && $value.ends_with(BRACKETS.1) {
+            list!($value; $values; BRACKETS.0, BRACKETS.1 => $obj)
+
+        } else if $value.starts_with(BRACKETS.2) && $value.ends_with(BRACKETS.3) { 
+            list!($value; $values; BRACKETS.2, BRACKETS.3 => $obj)
+
+        } else if $value.starts_with(BRACKETS.4) && $value.ends_with(BRACKETS.5) { 
+            list!($value; $values; BRACKETS.4, BRACKETS.5 => $obj)
+
+        } else if $value.starts_with(BRACKETS.6) && $value.ends_with(BRACKETS.7) { 
+            list!($value; $values; BRACKETS.6, BRACKETS.7 => $obj)
+
+        } else if $value.starts_with(BRACKETS.8) && $value.ends_with(BRACKETS.9) { 
+            list!($value; $values; BRACKETS.8, BRACKETS.9 => $obj)
+
+        } else { $result }
+    }};
+}
+macro_rules! syscall {
+    (
+        $($opts:ident),*;
+        $rax:expr, $rdi:expr, 
+        $rsi:expr, $rdx:expr $(=> $result:expr)?
+    ) =>
+    {
+        core::arch::asm!(
+            "syscall",
+            in("rax") $rax,
+            in("rdi") $rdi,
+            in("rsi") $rsi,
+            in("rdx") $rdx,
+            $(lateout("rax") $result,)?
+            options($($opts),*)
+        );
+    }
+}
+macro_rules! ioc {
+    (
+        $dir:expr, $type:expr, $nr:expr, $size:expr
+    ) =>
+    {
+        {
+            (($dir as u64)  << IOC_DIRSHIFT)  |
+            (($type as u64) << IOC_TYPESHIFT) |
+            (($nr as u64)   << IOC_NRSHIFT)   |
+            (($size as u64) << IOC_SIZESHIFT)
         }
     }
 }

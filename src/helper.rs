@@ -15,7 +15,10 @@
 //    You should have received a copy of the GNU General Public License
 //    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::constants::opts::{FORBIDDEN_SYMBOLS, LIST_BRACKETS, CAN_SNAP};
+use crate::constants::help::LIST_BRACKETS;
+use crate::constants::validation::{
+    FORBIDDEN_SYMBOLS, CAN_SNAP
+};
 use std::io::{stdin,}; //stdout};
 
 pub fn tutorial() -> Result<(), &'static str> {

@@ -16,16 +16,18 @@
 //    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::helper;
-use crate::constants::args::{
-    ARGS, FORBIDDEN_SYMBOLS,
-    EMPTY_ERROR, PATH_ERROR,
-    SYMBOL_ERROR, KEY_ERROR,
+
+use crate::constants::args::ARGS;
+use crate::constants::config::{
+    OPTS, COMMENTS, CONF_WARNING,
+    EASTER_EGG, EASTER_EGG_MSG,
 };
-use crate::constants::opts::{
-    OPTS, EASTER_EGG, EASTER_EGG_MSG,
-    LIST_ERROR, DQUOTES_ERROR, 
-    CONF_WARNING, COMMENTS, CAN_SNAP,
-    CANT_SNAP_ERROR,
+use crate::constants::validation::{
+    CAN_SNAP, FORBIDDEN_SYMBOLS, BRACKETS,
+
+    EMPTY_ERROR, DQUOTES_ERROR, LIST_ERROR,
+    KEY_ERROR, CANT_SNAP_ERROR, PATH_ERROR,
+    SYMBOL_ERROR,
 };
 
 use std::process::exit;
@@ -157,7 +159,9 @@ fn collect(objs: &Vec<String>, snap_info: &mut SnapshotInfo, conf: bool) -> Resu
                 if !(
                     (value.starts_with('<') || value.ends_with('>')) ||
                     (value.starts_with('[') || value.ends_with(']')) ||
-                    (value.starts_with('{') || value.ends_with('}'))
+                    (value.starts_with('{') || value.ends_with('}')) ||
+                    (value.starts_with('(') || value.ends_with(')')) ||
+                    (value.starts_with('|') || value.ends_with('|'))
                 ) {
                     dquotes!(value => error!(obj => DQUOTES_ERROR))?;
                     value = value.trim_matches('"');
@@ -172,7 +176,9 @@ fn collect(objs: &Vec<String>, snap_info: &mut SnapshotInfo, conf: bool) -> Resu
             if !(
                 (value.starts_with('<') || value.ends_with('>')) ||
                 (value.starts_with('[') || value.ends_with(']')) ||
-                (value.starts_with('{') || value.ends_with('}'))
+                (value.starts_with('{') || value.ends_with('}')) ||
+                (value.starts_with('(') || value.ends_with(')')) ||
+                (value.starts_with('|') || value.ends_with('|'))
             ) {
                 forbidden!(FORBIDDEN_SYMBOLS, value =>
                     error!(

@@ -15,44 +15,49 @@
 //    You should have received a copy of the GNU General Public License
 //    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+pub mod validation {
+    pub const CAN_SNAP: [&str; 7] = [
+        "fsroot", "usr", "var", "boot", 
+        "home", "root", "mnt",
+    ];
+    pub const FORBIDDEN_SYMBOLS: [&str; 22] = [
+        "'","\"","//",":",";","..","@","$","#","`","\\",
+        "*","[","]","{", "}","?","<",">",",","(",")",
+    ];
+    pub const BRACKETS: (
+        char, char, char, char, char,
+        char, char, char, char, char,
+    ) = ('<', '>', '[', ']', '{', '}', '(', ')', '|', '|');
+
+    pub const EMPTY_ERROR:     &str = "Empty value";
+    pub const PATH_ERROR:      &str = "Invalid path";
+    pub const KEY_ERROR:       &str = "Invalid argument/option";
+    pub const SYMBOL_ERROR:    &str = "Value contains forbidden symbol(s)";
+    pub const DQUOTES_ERROR:   &str = "Value must be put in double quotes";
+    pub const LIST_ERROR:      &str = "Unclosed list brackets";
+    pub const CANT_SNAP_ERROR: &str = "Can't snapshot item(s)";
+}
+
+pub mod help {
+    pub const LIST_BRACKETS: [&str; 5] = ["<>", "[]", "{}", "()", "||"];
+}
+
 pub mod args {
     pub const ARGS: [&str; 16] = [
         "--name", "--config", "--drive-uuid", "--grub-file", "--hooks",
         "--dir", "--ro-dir", "--fsroot", "--usr", "--var", "--boot", "--home",
         "--root", "--mnt", "--log", "--to-snap",
     ];
-    pub const FORBIDDEN_SYMBOLS: [&str; 22] = [
-        "'","\"","//",":",";","..","@","$","#","`","\\",
-        "*","[","]","{", "}","?","<",">",",","(",")",
-    ];
-    pub const EMPTY_ERROR:  &str = "Empty value";
-    pub const PATH_ERROR:   &str = "Invalid path";
-    pub const KEY_ERROR:    &str = "Invalid argument/option";
-    pub const SYMBOL_ERROR: &str = "Value contains forbidden symbol(s)";
 }
 
-pub mod opts {
+pub mod config {
     pub const OPTS: [&str; 15] = [
         "name", "drive_uuid", "grub_file", "hooks", "dir", "ro_dir",
         "fsroot", "usr", "var", "boot", "home", "root", "mnt", "log", 
         "to_snap",
     ];
-    pub const FORBIDDEN_SYMBOLS: [&str; 22] = [
-        "'","\"","//",":",";","..","@","$","#","`","\\",
-        "*","[","]","{", "}","?","<",">",",","(",")",
-    ];
-    pub const LIST_BRACKETS: [&str; 3] = ["<>", "[]", "{}"];
-    pub const CAN_SNAP:      [&str; 7] = ["fsroot", "usr", "var", "boot", "home", "root", "mnt"];
-
     pub const COMMENTS: (char, &str, &str, &str, &str, &str) = ('#', ";;", "==>", "-->", "//", "/*");
 
-    pub const PATH_ERROR:      &str = "Invalid path";
-    pub const KEY_ERROR:       &str = "Invalid argument/option";
-    pub const EMPTY_ERROR:     &str = "Empty option value";
-    pub const DQUOTES_ERROR:   &str = "Value must be put in double quotes";
-    pub const SYMBOL_ERROR:    &str = "Value contains forbidden symbol(s)";
-    pub const LIST_ERROR:      &str = "Unclosed list brackets";
-    pub const CANT_SNAP_ERROR: &str = "Can't snapshot item(s)";
     pub const CONF_WARNING:    &str = "Warning: could not find or open the configuration file";
 
     pub const EASTER_EGG:     &str = "btw";
