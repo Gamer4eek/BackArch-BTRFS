@@ -36,6 +36,7 @@ pub mod validation {
     pub const DQUOTES_ERROR:   &str = "Value must be put in double quotes";
     pub const LIST_ERROR:      &str = "Unclosed list brackets";
     pub const CANT_SNAP_ERROR: &str = "Can't snapshot item(s)";
+    pub const FSTAB_ERROR:     &str = "Can't edit fstab";
 }
 
 pub mod help {
@@ -43,18 +44,18 @@ pub mod help {
 }
 
 pub mod args {
-    pub const ARGS: [&str; 16] = [
+    pub const ARGS: [&str; 18] = [
         "--name", "--config", "--drive-uuid", "--grub-file", "--hooks",
         "--dir", "--ro-dir", "--fsroot", "--usr", "--var", "--boot", "--home",
-        "--root", "--mnt", "--log", "--to-snap",
+        "--root", "--mnt", "--log", "--to-snap", "--fstab", "--mcpio",
     ];
 }
 
 pub mod config {
-    pub const OPTS: [&str; 15] = [
+    pub const OPTS: [&str; 17] = [
         "name", "drive_uuid", "grub_file", "hooks", "dir", "ro_dir",
         "fsroot", "usr", "var", "boot", "home", "root", "mnt", "log", 
-        "to_snap",
+        "to_snap", "fstab", "mcpio",
     ];
     pub const COMMENTS: (char, &str, &str, &str, &str, &str) = ('#', ";;", "==>", "-->", "//", "/*");
 

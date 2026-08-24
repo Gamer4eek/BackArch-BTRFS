@@ -53,6 +53,8 @@ pub struct SnapshotInfo {
     pub mnt_path:    Option<String>,
     pub log_file:    Option<String>,
     pub to_snap:     Option<Vec<String>>,
+    pub fstab_path:  Option<String>,
+    pub mcpio_path:  Option<String>,
 }
 
 impl SnapshotInfo {
@@ -74,6 +76,8 @@ impl SnapshotInfo {
             mnt_path:    None,
             log_file:    None,
             to_snap:     None,
+            fstab_path:  None,
+            mcpio_path:  None,
         }
     }
     pub fn parse_args(&mut self) -> Result<(), &'static str> {
@@ -106,7 +110,7 @@ impl SnapshotInfo {
                 Ok(line) => {
                     if line.trim().is_empty() { continue; } else { line }
                 }
-                Err(_) => { eprintln!("{}", CONF_WARNING); break; }
+                Err(_) => { eprintln!("{}", CONF_WARNING); break; return Ok(()); }
             };
             comments!(line, opts);
             if opts.iter().any(|s| EASTER_EGG.contains(s.trim())) {
@@ -257,6 +261,14 @@ fn collect(objs: &Vec<String>, snap_info: &mut SnapshotInfo, conf: bool) -> Resu
                 list!(value; values => obj; error!(obj, { helper::help()?; } => LIST_ERROR))?;
                 insert!(vec: snap_info, to_snap = values)
             }
+            v if v == ARGS[16]  => { 
+                path!(value, is_file => error!(obj => PATH_ERROR))?;
+                insert!(snap_info, fstab_path = value) 
+            }
+            v if v == ARGS[17]  => { 
+                path!(value, is_file => error!(obj => PATH_ERROR))?;
+                insert!(snap_info, mcpio_path = value) 
+            }
 
             v if v == OPTS[0]  => { insert!(snap_info, name = value) }
             v if v == OPTS[1]  => { insert!(snap_info, drive_uuid = value) }
@@ -312,6 +324,14 @@ fn collect(objs: &Vec<String>, snap_info: &mut SnapshotInfo, conf: bool) -> Resu
                 let mut values: Vec<String> = Vec::with_capacity(6);
                 list!(value; values => obj; error!(obj, { helper::help()?; } => LIST_ERROR))?;
                 insert!(vec: snap_info, to_snap = values)
+            }
+            v if v == OPTS[15]  => { 
+                path!(value, is_file => error!(obj => PATH_ERROR))?;
+                insert!(snap_info, fstab_path = value) 
+            }
+            v if v == OPTS[16]  => { 
+                path!(value, is_file => error!(obj => PATH_ERROR))?;
+                insert!(snap_info, mcpio_path = value) 
             }
 
             _ => { error!(obj, { helper::help()?; } => KEY_ERROR) }

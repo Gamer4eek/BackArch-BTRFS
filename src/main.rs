@@ -22,6 +22,8 @@ mod constants;
 mod helper;
 mod parser;
 mod syscalls;
+mod file_parser;
+
 
 fn main() -> Result<(), &'static str> {
     let mut snap_info = parser::SnapshotInfo::new();
@@ -32,16 +34,23 @@ fn main() -> Result<(), &'static str> {
 
     println!("{:#?}", snap_info);
 
-    let Some(name) = snap_info.name else {
+    let Some(name) = &snap_info.name else {
         return Err("No name");
     };
-    let Some(dir) = snap_info.dir else {
+    let Some(dir) = &snap_info.dir else {
         return Err("No dir");
     };
-    let Some(fsroot) = snap_info.fsroot_path else {
+    let Some(fsroot) = &snap_info.fsroot_path else {
         return Err("No fsroot path");
     };
+    let Some(fstab) = &snap_info.fstab_path else {
+        return Err("no fstab");
+    };
+    let Some(to_snap) = &snap_info.to_snap else {
+        return Err("nothing to snap");
+    };
 
+    snap_info.parse_fstab(fstab, name, to_snap)?;
 //    syscalls::make_syscall(&name, &dir, &fsroot)?;
     Ok(())
 }
