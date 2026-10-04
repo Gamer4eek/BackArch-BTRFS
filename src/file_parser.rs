@@ -16,17 +16,18 @@
 //    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::io::{BufRead, BufReader, Write, BufWriter};
-use std::fs::{File, OpenOptions, metadata, self};
+use std::fs::{File, OpenOptions, metadata, self, rename};
 use std::path::Path;
 use crate::parser;
-use crate::constants::validation::{FSTAB_ERROR, CAN_SNAP};
+use crate::constants::validation::{FSTAB_ERROR};
 
 impl parser::SnapshotInfo {
     pub fn parse_fstab(
         &self, 
         fstab_file: &str,
-        name: &str,
-        to_snap: &Vec<String>,
+        name:       &str,
+        dir:        &str,
+        to_snap:    &Vec<String>,
     ) -> Result<(), &'static str> {
         let file = File::open(fstab_file).map_err(|_| FSTAB_ERROR)?;
 
@@ -41,19 +42,55 @@ impl parser::SnapshotInfo {
 
         for line in BufRead::lines(&mut reader) {
             let mut line = line.map_err(|_| FSTAB_ERROR)?;
-            for snap in to_snap {
-                if CAN_SNAP.contains(&snap.as_str()) {
-                    line = line.replace(
-                        &format!("subvol={}{}", snap), 
-                        &format!("subvol=/@snaps/{}/{}", name, snap)
-                    );
-                }
+            let mut comm = "".to_string();
+
+            if !line.trim().starts_with('#') {
+                let (body, com) = match line.split_once('#') {
+                    Some((part, com)) => (part.trim().to_string(), com.to_string()),
+                    None => (line, "".to_string())
+                };
+                (line, comm) = (body, com);
             }
-            writeln!(writer, "{}", line).map_err(|_| FSTAB_ERROR)?;
+
+            for snap in to_snap {
+                if line.contains("subvol=") {
+                    let cut = match line.split_once("subvol=") {
+                        Some((_, part)) => { 
+                            match part.split_once(['\t', ' ']) {
+                                Some((part, _)) => part.trim().trim_matches(','),
+                                None => {
+                                    return Err(error!(line => FSTAB_ERROR)?);
+                                }
+                            }
+                        },
+                        None => {
+                            return Err(error!(line => FSTAB_ERROR)?);
+                        }
+                    };
+                    let pcut = match cut.rsplit_once('/') {
+                        Some((_, part)) => part.trim(),
+                        None => ""
+                    };
+                    match pcut {
+                        v if v == snap || v == dir => {
+                            line = line.replace(
+                                &format!("subvol={}", cut), 
+                                &format!("subvol=/{}/{}/{}", dir, name, snap)
+                            );        
+                        }
+                        _ => continue
+                    }
+                } else { continue; }
+            }
+            if comm != "" {
+                writeln!(writer, "{} #{}", line, comm).map_err(|_| FSTAB_ERROR)?;
+            } else {
+                writeln!(writer, "{}", line).map_err(|_| FSTAB_ERROR)?;
+            }
         }
         writer.flush().map_err(|_| FSTAB_ERROR)?;
         drop(writer);
-        std::fs::rename(&tmp, fstab_file).map_err(|_| FSTAB_ERROR)?;
+        rename(&tmp, fstab_file).map_err(|_| FSTAB_ERROR)?;
 
         Ok(())
     }

@@ -20,8 +20,8 @@ pub mod validation {
         "fsroot", "usr", "var", "boot", 
         "home", "root", "mnt",
     ];
-    pub const FORBIDDEN_SYMBOLS: [&str; 23] = [
-        "'","\"","//",":",";","..","@","$","#","`","\\",
+    pub const FORBIDDEN_SYMBOLS: [&str; 22] = [
+        "'","\"","//",":",";","..","$","#","`","\\",
         "*","[","]","{", "}","?","<",">",",","(",")","|"
     ];
     pub const BRACKETS: (

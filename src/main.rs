@@ -34,7 +34,7 @@ fn main() -> Result<(), &'static str> {
 
     println!("{:#?}", snap_info);
 
-    let Some(name) = &snap_info.name else {
+    let Some(name) = snap_info.name.clone() else {
         return Err("No name");
     };
     let Some(dir) = &snap_info.dir else {
@@ -50,7 +50,7 @@ fn main() -> Result<(), &'static str> {
         return Err("nothing to snap");
     };
 
-    snap_info.parse_fstab(fstab, name, to_snap)?;
-//    syscalls::make_syscall(&name, &dir, &fsroot)?;
+    snap_info.parse_fstab(fstab, &name, &dir, to_snap)?;
+//    syscalls::make_syscall(name, &dir, &fsroot)?;
     Ok(())
 }

@@ -31,6 +31,7 @@ struct vol_args {
     transid: u64,
     flags:   u64,
     qgroups: [u64; 4],
+//    name:    &'a Vec<u8>,
     name:    [u8; 4040],
 }
 
@@ -40,7 +41,7 @@ const SNAP_CREATE_V2: u64 = ioc!(
 );
 
 pub fn make_syscall(
-    snap_name: &str,
+    snap_name: String,
     snap_dir:  &str,
     fsroot:    &str,
 ) -> Result<(), &'static str> {
