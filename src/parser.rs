@@ -113,7 +113,7 @@ impl SnapshotInfo {
                 Err(_) => { eprintln!("{}", CONF_WARNING); break; return Ok(()); }
             };
             comments!(line, opts);
-            if opts.iter().any(|s| EASTER_EGG.contains(s.trim())) {
+            if opts.iter().any(|s| s.trim().contains(EASTER_EGG)) {
                 println!("{}", EASTER_EGG_MSG); exit(0);
             }
         }
